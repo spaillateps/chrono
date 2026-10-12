@@ -65,7 +65,8 @@ input[type=number]{width:80px;font:inherit;padding:6px;border-radius:8px;border:
 <div class="card" style="margin-top:12px">
 <details open>
 <summary>Réglages</summary>
-<p style="color:var(--mut);font-size:14px;margin:8px 0 0">Placez la colonne jaune sur la ligne d'arrivée. Le couloir est identifié par la hauteur des <b>pieds</b> dans l'image : plus ils sont bas, plus le couloir est proche. Réglez les deux lignes pointillées pour séparer les couloirs 2, 4 et 6 (faites passer quelqu'un dans chaque couloir pour calibrer).</p>
+<p style="color:var(--mut);font-size:14px;margin:8px 0 0">Placez la colonne jaune sur la ligne d'arrivée. Le couloir est identifié par la hauteur des <b>pieds</b> dans l'image : plus ils sont bas, plus le couloir est proche. Le plus fiable : utilisez la <b>calibration</b> ci-dessous. Touchez un bouton, puis faites passer un coureur dans ce couloir : la taille et la hauteur des pieds mesurées servent ensuite à reconnaître le couloir. Sans calibration, réglez les deux lignes pointillées.</p>
+<div class="row" id="calRow"><button data-l="0">Calibrer couloir 2</button><button data-l="1">Calibrer couloir 4</button><button data-l="2">Calibrer couloir 6</button><button id="calClr">Effacer</button></div>
 <label>Position de la ligne d'arrivée (gauche ↔ droite)<input type="range" id="sX" min="2" max="98" value="50"></label>
 <label>Largeur de la colonne<input type="range" id="sW" min="1" max="10" value="3"></label>
 <label>Limite couloir 2 / couloir 4 (pieds en dessous = couloir 2)<input type="range" id="sB1" min="10" max="95" value="72"></label>
@@ -175,7 +176,16 @@ function startVideoLoop(){
   function loop(){process();if(useRVFC)v.requestVideoFrameCallback(loop);else requestAnimationFrame(loop)}
   if(useRVFC)v.requestVideoFrameCallback(loop);else requestAnimationFrame(loop);
 }
-function laneOf(bottomPct){
+var cal=[null,null,null],calT=-1,calBest=null,calEnd=0;
+var btns=document.querySelectorAll('#calRow button[data-l]');
+Array.prototype.forEach.call(btns,function(b){b.onclick=function(){calT=+b.dataset.l;calBest=null;calEnd=0;status('Calibration : faites passer un coureur dans le '+names[calT].toLowerCase()+'…')}});
+$('calClr').onclick=function(){cal=[null,null,null];calT=-1;Array.prototype.forEach.call(btns,function(b,i){b.textContent='Calibrer '+names[i].toLowerCase()});status('Calibration effacée.')};
+function laneOf(bottomPct,hPct){
+  if(cal[0]&&cal[1]&&cal[2]){
+    var best=0,bd=1e9;
+    for(var L=0;L<3;L++){var dd=Math.abs(bottomPct-cal[L].b)+Math.abs(hPct-cal[L].h);if(dd<bd){bd=dd;best=L}}
+    return best;
+  }
   var b1=+$('sB1').value,b2=Math.min(+$('sB2').value,b1-1);
   return bottomPct>b1?0:(bottomPct>b2?1:2);
 }
@@ -200,7 +210,18 @@ function process(){
   }
   prev=cur;
   var hit=[false,false,false];
-  segs.forEach(function(g){g[2]=laneOf(g[1]/H*100);hit[g[2]]=true});
+  if(calT>=0&&segs.length){
+    var bg=segs[0];segs.forEach(function(g){if(g[1]-g[0]>bg[1]-bg[0])bg=g});
+    if(!calBest||bg[1]-bg[0]>calBest[1]-calBest[0])calBest=bg;
+    if(!calEnd)calEnd=now+1200;
+  }
+  if(calT>=0&&calEnd&&now>calEnd){
+    cal[calT]={b:calBest[1]/H*100,h:(calBest[1]-calBest[0]+1)/H*100};
+    btns[calT].textContent='✓ '+names[calT];
+    status(cal[0]&&cal[1]&&cal[2]?'Calibration terminée pour les 3 couloirs.':'Couloir enregistré. Calibrez les autres couloirs.');
+    calT=-1;calBest=null;calEnd=0;
+  }
+  segs.forEach(function(g){g[2]=laneOf(g[1]/H*100,(g[1]-g[0]+1)/H*100);hit[g[2]]=true});
   for(var L=0;L<3;L++)if(hit[L]&&mode==='running'&&!lane[L].done&&now-lane[L].last>S.gap&&now-t0>300)stamp(L,now);
   draw(xa,cw,segs);
 }
@@ -211,9 +232,9 @@ function draw(xa,cw,segs){
   ox.fillStyle='rgba(255,212,59,.18)';ox.fillRect(x,0,w,OH);
   ox.strokeStyle='#ffd43b';ox.lineWidth=3;ox.strokeRect(x,0,w,OH);
   ox.setLineDash([14,10]);ox.lineWidth=2;ox.strokeStyle='rgba(255,255,255,.85)';
-  [b1,b2].forEach(function(b){var y=b/100*OH;ox.beginPath();ox.moveTo(0,y);ox.lineTo(OW,y);ox.stroke()});
+  (cal[0]&&cal[1]&&cal[2]?[]:[b1,b2]).forEach(function(b){var y=b/100*OH;ox.beginPath();ox.moveTo(0,y);ox.lineTo(OW,y);ox.stroke()});
   ox.setLineDash([]);ox.font='bold 26px sans-serif';ox.shadowColor='#000';ox.shadowBlur=4;
-  [[b1,100,0],[b2,b1,1],[0,b2,2]].forEach(function(z){
+  (cal[0]&&cal[1]&&cal[2]?[]:[[b1,100,0],[b2,b1,1],[0,b2,2]]).forEach(function(z){
     ox.fillStyle=colv[z[2]];ox.fillText(names[z[2]],10,(z[0]+z[1])/2/100*OH+9);
   });
   ox.shadowBlur=0;
