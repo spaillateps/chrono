@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chrono 60 m</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f4f5f7;--card:#fff;--tx:#14181f;--mut:#667085;--bd:#d9dce2;--ac:#1d6fe8;
+--c1:#e5484d;--c2:#2f9e44;--c3:#1d6fe8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10131a;--card:#1b2029;--tx:#eef0f4;--mut:#98a2b3;--bd:#2c3340;--ac:#5b9bff}}
+:root[data-theme="dark"]{--bg:#10131a;--card:#1b2029;--tx:#eef0f4;--mut:#98a2b3;--bd:#2c3340;--ac:#5b9bff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 -apple-system,system-ui,"Segoe UI",sans-serif;padding:12px;max-width:1100px;margin-inline:auto}
+h1{font-size:20px;margin:0 0 8px}
+h3{margin:0 0 8px;font-size:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:12px}
+#vwrap{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}
+video,#ov{position:absolute;inset:0;width:100%;height:100%;display:block}
+#msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#fff;padding:20px;background:rgba(0,0,0,.55)}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+button{font:inherit;font-weight:600;padding:12px 16px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);cursor:pointer;min-height:48px}
+button.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+button.s{min-height:40px;padding:8px 12px;font-size:14px}
+button:disabled{opacity:.45}
+#status{font-weight:600;margin-top:10px}
+#lvl{position:relative;height:12px;background:var(--bd);border-radius:6px;margin-top:8px;overflow:hidden}
+#lvlb{height:100%;width:0;background:var(--ac)}
+#thr{position:absolute;top:0;bottom:0;width:3px;background:var(--c1)}
+#heatBar{display:flex;align-items:center;gap:10px;justify-content:space-between}
+#heatLbl{font-size:20px;font-weight:700;text-align:center;flex:1}
+.lanes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+@media (max-width:640px){.lanes{grid-template-columns:1fr}}
+.lane{border-top:6px solid var(--k);padding:10px;background:var(--card);border-radius:12px;border-left:1px solid var(--bd);border-right:1px solid var(--bd);border-bottom:1px solid var(--bd)}
+.lane h2{margin:0;font-size:14px;color:var(--k)}
+.lane .nm{font-size:18px;font-weight:700;min-height:26px}
+.lane.empty{opacity:.5}
+.t{font:700 48px/1.1 ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;margin:4px 0}
+.lane.done .t{color:var(--k)}
+.lane .row{margin-top:6px}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--bd)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.none td{color:var(--mut)}
+details summary{font-weight:600;cursor:pointer}
+label{display:block;margin-top:10px;font-size:14px;color:var(--mut)}
+label b{color:var(--tx)}
+input[type=range]{width:100%}
+input[type=number],select{font:inherit;padding:6px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx)}
+input[type=number]{width:80px}
+textarea{width:100%;height:220px;font:14px/1.4 ui-monospace,Menlo,monospace;padding:8px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx)}
+</style>
+</head>
+<body>
+<h1>⏱ Chrono 60 m</h1>
+
+<div class="card">
+  <div id="vwrap">
+    <video id="v" playsinline muted autoplay></video>
+    <canvas id="ov" width="960" height="540"></canvas>
+    <div id="msg">Touchez « Activer caméra et micro » pour commencer</div>
+  </div>
+  <div id="lvl"><div id="lvlb"></div><div id="thr"></div></div>
+  <div id="status">Prêt.</div>
+  <div class="row">
+    <button class="p" id="bCam">Activer caméra et micro</button>
+    <button class="p" id="bArm" disabled>Armer (attente du sifflet)</button>
+    <button id="bMan" disabled>Départ manuel</button>
+    <button id="bStop" disabled>Arrêter la série</button>
+  </div>
+</div>
+
+<div class="card" id="heatBar">
+  <button id="bPrev">◀ Précédente</button>
+  <div id="heatLbl">Série 1</div>
+  <button id="bNext">Suivante ▶</button>
+</div>
+
+<div class="lanes" id="lanes"></div>
+
+<div class="card">
+  <h3>Résultats</h3>
+  <table id="res"></table>
+  <div class="row">
+    <button class="s" id="bCsv">Télécharger (CSV)</button>
+    <button class="s" id="bCopy">Copier</button>
+    <button class="s" id="bClear">Effacer tous les résultats</button>
+  </div>
+</div>
+
+<div class="card">
+<details>
+<summary>Réglages</summary>
+<p style="color:var(--mut);font-size:14px;margin:8px 0 0"><b>Calibration (à refaire si l'iPad bouge) :</b> touchez un bouton, puis faites passer un coureur dans ce couloir devant la colonne jaune. Sans calibration, le couloir est déduit de la hauteur des pieds avec les deux lignes pointillées.</p>
+<div class="row" id="calRow"></div>
+<label>Couloir le plus proche de la caméra :
+ <select id="near"><option value="low">le plus petit numéro</option><option value="high">le plus grand numéro</option></select></label>
+<label>Position de la ligne d'arrivée (gauche ↔ droite)<input type="range" id="sX" min="2" max="98" value="50"></label>
+<label>Largeur de la colonne<input type="range" id="sW" min="1" max="10" value="3"></label>
+<label>Limite proche / milieu (sans calibration)<input type="range" id="sB1" min="10" max="95" value="72"></label>
+<label>Limite milieu / éloigné (sans calibration)<input type="range" id="sB2" min="5" max="90" value="52"></label>
+<label>Hauteur minimale d'un coureur détecté : <b id="vSen">12</b> % de l'image<input type="range" id="sSen" min="3" max="50" value="12"></label>
+<label>Seuil du sifflet : <b id="vThr">45</b> %<input type="range" id="sThr" min="5" max="95" value="45"></label>
+<label>Ignorer les détections pendant les premières : <input type="number" id="minT" min="0" max="20" step="0.5" value="4"> s</label>
+<label>Distance iPad ↔ sifflet : <input type="number" id="dist" min="0" max="100" value="0"> m (compense le trajet du son)</label>
+<label>Liste des élèves (une ligne par élève : <code>Nom;couloir</code>). Les séries sont formées avec le 1er de chaque couloir, puis le 2e, etc.
+<textarea id="list" spellcheck="false"></textarea></label>
+<div class="row"><button class="s" id="bApply">Appliquer la liste</button><button class="s" id="bReset">Remettre la liste d'origine</button></div>
+</details>
+</div>
+
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)};
+var store={
+  get:function(k){try{return localStorage.getItem(k)}catch(e){return null}},
+  set:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+};
+var DEFAULT_LIST=[
+"Edouard BARRE;3","Nolan BONNET;3","Maxime BOUDEAU;3","Alban BROSSEAU;3","Eloi CHATELUS;3","Marius CORCAUD;3","Julie FERRY ROUXEL;3","Léa FORTIN;3","Margot GARNIER;3",
+"Théo GILBERT MARCHAND;4","Maëlia HOEPPE;4","Adam JADEAU MADIOT;4","Goulvenn JEROSME DECAP;4","Maël LAIDET;4","Maëlys LE CHARLES;4","Eline LEMASSON;4",
+"Ewen MARQUES;5","Zacharie MERLET;5","Izia NAUD;5","Nolan PECHIN;5","Emmanuel PROUX;5","Félix-Antoine RINCE;5","Natéo TERRIEN;5","Marie TRAVERT;5","Thibault VIVION;5"
+].join("\n");
+
+var colVar=['--c1','--c2','--c3'],colHex=['#e5484d','#2f9e44','#1d6fe8'];
+var v=$('v'),ov=$('ov'),ox=ov.getContext('2d');
+var students=[],lanes=[],byLane=[],nH=1,h=0,L=[],cal=[];
+var results={};try{results=JSON.parse(store.get('chrono60_results')||'{}')||{}}catch(e){results={}}
+var calSaved={};try{calSaved=JSON.parse(store.get('chrono60_cal')||'{}')||{}}catch(e){calSaved={}}
+var mode='idle',t0=0,stream=null,actx=null,an=null,fb=null;
+var S={thr:.45,minT:4000,dist:0};
+
+function status(s){$('status').textContent=s}
+function fmt(ms){return (ms/1000).toFixed(2)}
+
+/* ---------- liste & séries ---------- */
+function parse(txt){
+  var out=[];
+  txt.split(/\r?\n/).forEach(function(l){
+    l=l.trim();if(!l)return;
+    var m=l.match(/^(.*?)\s*[;\t,]\s*(\d+)\s*$/)||l.match(/^(.*\S)\s+(\d+)$/);
+    if(m)out.push({name:m[1].trim(),lane:+m[2]});
+  });
+  return out;
+}
+function build(){
+  students=parse($('list').value);
+  var ls=[];students.forEach(function(s){if(ls.indexOf(s.lane)<0)ls.push(s.lane)});
+  ls.sort(function(a,b){return a-b});
+  lanes=ls.slice(0,3);
+  byLane=lanes.map(function(n){return students.filter(function(s){return s.lane===n})});
+  nH=Math.max.apply(null,byLane.map(function(a){return a.length}).concat([1]));
+  h=Math.min(h,nH-1);
+  cal=lanes.map(function(n){return calSaved[n]||null});
+  buildLanes();buildCal();renderHeat();renderResults();
+  if(ls.length>3)status('⚠ Plus de 3 couloirs dans la liste : seuls les 3 premiers sont gérés.');
+}
+function buildLanes(){
+  var box=$('lanes');box.innerHTML='';L=[];
+  lanes.forEach(function(n,i){
+    var d=document.createElement('div');d.className='lane';d.style.setProperty('--k','var('+colVar[i]+')');
+    d.innerHTML='<h2>Couloir '+n+'</h2><div class="nm"></div><div class="t">0.00</div><div class="row"><button class="s bs">Arrêter</button><button class="s bc">Effacer le temps</button></div>';
+    box.appendChild(d);
+    var o={n:n,el:d,nm:d.querySelector('.nm'),t:d.querySelector('.t'),s:null,ms:null};
+    d.querySelector('.bs').onclick=function(){if(mode==='running'&&o.s&&o.ms==null)stamp(i,performance.now())};
+    d.querySelector('.bc').onclick=function(){if(o.s&&o.ms!=null){delete results[o.s.name];saveRes();o.ms=null;renderHeat();renderResults()}};
+    L.push(o);
+  });
+}
+function buildCal(){
+  var row=$('calRow');row.innerHTML='';
+  lanes.forEach(function(n,i){
+    var b=document.createElement('button');b.className='s';b.textContent=(cal[i]?'✓ ':'')+'Calibrer couloir '+n;b.dataset.i=i;
+    b.onclick=function(){calT=i;calBest=null;calEnd=0;status('Calibration : faites passer un coureur dans le couloir '+n+'…')};
+    row.appendChild(b);
+  });
+  var c=document.createElement('button');c.className='s';c.textContent='Effacer la calibration';
+  c.onclick=function(){cal=lanes.map(function(){return null});calSaved={};store.set('chrono60_cal','{}');calT=-1;buildCal();status('Calibration effacée.')};
+  row.appendChild(c);
+}
+function renderHeat(){
+  $('heatLbl').textContent='Série '+(h+1)+' / '+nH;
+  L.forEach(function(l,i){
+    var s=byLane[i][h]||null;l.s=s;
+    l.nm.textContent=s?s.name:'— (pas de coureur)';
+    l.ms=(s&&results[s.name])?results[s.name].ms:null;
+    l.el.classList.toggle('empty',!s);
+    l.el.classList.toggle('done',l.ms!=null);
+    l.t.textContent=l.ms!=null?fmt(l.ms):'0.00';
+  });
+  updButtons();
+}
+function updButtons(){
+  var busy=(mode==='armed'||mode==='running');
+  $('bPrev').disabled=busy||h<=0;
+  $('bNext').disabled=busy||h>=nH-1;
+  $('bArm').disabled=!stream||busy;
+  $('bMan').disabled=!stream||busy;
+  $('bStop').disabled=!(mode==='armed'||mode==='running');
+}
+$('bPrev').onclick=function(){if(h>0){h--;mode='idle';renderHeat();status('Prêt. Touchez « Armer » puis sifflez.')}};
+$('bNext').onclick=function(){if(h<nH-1){h++;mode='idle';renderHeat();status('Prêt. Touchez « Armer » puis sifflez.')}};
+
+/* ---------- résultats ---------- */
+function saveRes(){store.set('chrono60_results',JSON.stringify(results))}
+function sortedRes(){
+  return Object.keys(results).map(function(k){return results[k]}).sort(function(a,b){return a.ms-b.ms});
+}
+function renderResults(){
+  var tb=$('res');tb.innerHTML='';
+  var head=document.createElement('tr');
+  ['Rang','Élève','Couloir','Série','Temps (s)'].forEach(function(t,i){var th=document.createElement('th');th.textContent=t;if(i===4||i===0)th.className='n';head.appendChild(th)});
+  tb.appendChild(head);
+  var list=sortedRes();
+  list.forEach(function(r,i){
+    var tr=document.createElement('tr');
+    [i+1,r.name,r.lane,r.heat,fmt(r.ms)].forEach(function(t,j){var td=document.createElement('td');td.textContent=t;if(j===4||j===0)td.className='n';tr.appendChild(td)});
+    tb.appendChild(tr);
+  });
+  students.forEach(function(s){
+    if(results[s.name])return;
+    var tr=document.createElement('tr');tr.className='none';
+    var td=document.createElement('td');td.textContent='–';td.className='n';tr.appendChild(td);
+    [s.name,s.lane,'','pas encore'].forEach(function(t,j){var c=document.createElement('td');c.textContent=t;if(j===3)c.className='n';tr.appendChild(c)});
+    tb.appendChild(tr);
+  });
+}
+function csvText(){
+  var rows=['Rang;Nom;Couloir;Série;Temps (s)'];
+  sortedRes().forEach(function(r,i){rows.push([i+1,r.name,r.lane,r.heat,(r.ms/1000).toFixed(2).replace('.',',')].join(';'))});
+  students.forEach(function(s){if(!results[s.name])rows.push(['',s.name,s.lane,'',''].join(';'))});
+  return rows.join('\n');
+}
+$('bCsv').onclick=function(){
+  var b=new Blob(['﻿'+csvText()],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='resultats-60m.csv';
+  document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a)},500);
+};
+$('bCopy').onclick=function(){
+  var t=csvText();
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){status('Résultats copiés.')},function(){status('Copie impossible : utilisez le bouton Télécharger.')})}
+  else status('Copie impossible : utilisez le bouton Télécharger.');
+};
+$('bClear').onclick=function(){
+  if(!confirm('Effacer tous les temps enregistrés ?'))return;
+  results={};saveRes();h=0;mode='idle';renderHeat();renderResults();status('Résultats effacés.');
+};
+
+/* ---------- course ---------- */
+function activeLanes(){return L.filter(function(l){return l.s})}
+function prepare(){
+  var any=L.some(function(l){return l.s&&l.ms!=null});
+  if(any&&!confirm('Cette série a déjà des temps. Les refaire ?'))return false;
+  L.forEach(function(l){if(l.s){delete results[l.s.name]}l.ms=null;l.last=-1e9;l.el.classList.remove('done');l.t.textContent='0.00'});
+  saveRes();renderResults();
+  return true;
+}
+function arm(){
+  if(!activeLanes().length){status('Aucun coureur dans cette série.');return}
+  if(!prepare())return;
+  mode='armed';updButtons();status('🎧 Armé : en attente du coup de sifflet…');
+}
+function start(offsetMs){
+  t0=performance.now()-(offsetMs||0);mode='running';updButtons();status('🏃 Course en cours');
+}
+function finish(){
+  mode='finished';updButtons();
+  var miss=activeLanes().filter(function(l){return l.ms==null});
+  status(miss.length?'⏹ Série arrêtée. Sans temps : '+miss.map(function(l){return l.s.name}).join(', ')+'.':'✅ Série terminée.');
+}
+function stamp(i,now){
+  var l=L[i];if(!l.s||l.ms!=null)return;
+  var ms=now-t0;l.ms=ms;
+  results[l.s.name]={name:l.s.name,lane:l.n,heat:h+1,ms:ms};saveRes();
+  l.el.classList.add('done');l.t.textContent=fmt(ms);renderResults();
+  if(activeLanes().every(function(x){return x.ms!=null}))finish();
+}
+$('bArm').onclick=arm;
+$('bMan').onclick=function(){if(!activeLanes().length){status('Aucun coureur dans cette série.');return}if(prepare())start(0)};
+$('bStop').onclick=function(){if(mode==='armed'){mode='idle';updButtons();status('Armement annulé.')}else if(mode==='running')finish()};
+
+(function tick(){
+  if(mode==='running'){
+    var now=performance.now();
+    L.forEach(function(l){if(l.s&&l.ms==null)l.t.textContent=fmt(now-t0)});
+  }
+  requestAnimationFrame(tick);
+})();
+
+/* ---------- réglages ---------- */
+$('sThr').oninput=function(){$('vThr').textContent=this.value;S.thr=this.value/100;$('thr').style.left=this.value+'%'};
+$('sSen').oninput=function(){$('vSen').textContent=this.value};
+$('minT').oninput=function(){S.minT=(+this.value||0)*1000};
+$('dist').oninput=function(){S.dist=+this.value||0};
+$('thr').style.left='45%';
+$('list').value=store.get('chrono60_list')||DEFAULT_LIST;
+$('bApply').onclick=function(){store.set('chrono60_list',$('list').value);build();status('Liste appliquée : '+students.length+' élèves, '+nH+' séries.')};
+$('bReset').onclick=function(){$('list').value=DEFAULT_LIST;store.set('chrono60_list',DEFAULT_LIST);build();status('Liste d\'origine rétablie.')};
+
+/* ---------- caméra + micro ---------- */
+$('bCam').onclick=async function(){
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720},frameRate:{ideal:60}},
+      audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}
+    });
+  }catch(e){
+    $('msg').textContent='Accès refusé ou indisponible ('+e.name+'). Autorisez caméra et micro dans Safari.';
+    return;
+  }
+  v.srcObject=stream;await v.play();
+  v.addEventListener('loadedmetadata',fit);fit();
+  function fit(){if(v.videoWidth)$('vwrap').style.aspectRatio=v.videoWidth+'/'+v.videoHeight}
+  $('msg').style.display='none';$('bCam').style.display='none';
+  try{if(navigator.wakeLock)await navigator.wakeLock.request('screen')}catch(e){}
+  setupAudio();startVideoLoop();updButtons();status('Prêt. Touchez « Armer » puis sifflez.');
+};
+document.addEventListener('visibilitychange',async function(){
+  if(document.visibilityState==='visible'&&stream&&navigator.wakeLock){try{await navigator.wakeLock.request('screen')}catch(e){}}
+});
+
+function setupAudio(){
+  var AC=window.AudioContext||window.webkitAudioContext;
+  actx=new AC();actx.resume();
+  var src=actx.createMediaStreamSource(stream);
+  an=actx.createAnalyser();an.fftSize=512;an.smoothingTimeConstant=0;
+  src.connect(an);fb=new Uint8Array(an.frequencyBinCount);
+  var hz=actx.sampleRate/an.fftSize,lo=Math.floor(2000/hz),hi=Math.ceil(4500/hz);
+  setInterval(function(){
+    an.getByteFrequencyData(fb);
+    var m=0;for(var i=lo;i<=hi;i++)if(fb[i]>m)m=fb[i];
+    var lv=m/255;$('lvlb').style.width=(lv*100)+'%';
+    if(mode==='armed'&&lv>S.thr){start(S.dist/343*1000)}
+  },8);
+}
+
+/* ---------- photo finish ---------- */
+var W=256,H=144,cv=document.createElement('canvas');cv.width=W;cv.height=H;
+var cx=cv.getContext('2d',{willReadFrequently:true}),prev=null;
+var calT=-1,calBest=null,calEnd=0;
+function startVideoLoop(){
+  var useRVFC='requestVideoFrameCallback' in v;
+  function loop(){process();if(useRVFC)v.requestVideoFrameCallback(loop);else requestAnimationFrame(loop)}
+  if(useRVFC)v.requestVideoFrameCallback(loop);else requestAnimationFrame(loop);
+}
+function calibrated(){return lanes.length>0&&cal.every(function(c){return !!c})}
+function zoneOf(bottomPct){
+  var b1=+$('sB1').value,b2=Math.min(+$('sB2').value,b1-1);
+  return bottomPct>b1?0:(bottomPct>b2?1:2);
+}
+function zoneToLane(z){
+  var n=lanes.length;if(!n)return 0;
+  z=Math.min(z,n-1);
+  return $('near').value==='low'?z:(n-1-z);
+}
+function laneOf(bottomPct,hPct){
+  if(calibrated()){
+    var best=-1,bd=1e9;
+    for(var i=0;i<L.length;i++){
+      if(!L[i].s)continue;
+      var d=Math.abs(bottomPct-cal[i].b)+Math.abs(hPct-cal[i].h);
+      if(d<bd){bd=d;best=i}
+    }
+    if(best>=0)return best;
+  }
+  return zoneToLane(zoneOf(bottomPct));
+}
+function process(){
+  var now=performance.now();
+  cx.drawImage(v,0,0,W,H);
+  var cw=Math.max(2,Math.round(W*(+$('sW').value)/100));
+  var xa=Math.min(W-cw,Math.max(0,Math.round(W*(+$('sX').value)/100-cw/2)));
+  var data=cx.getImageData(xa,0,cw,H).data,n=cw*H;
+  var cur=new Uint8Array(n);
+  for(var p=0,q=0;p<n;p++,q+=4)cur[p]=(data[q]*77+data[q+1]*150+data[q+2]*29)>>8;
+  var segs=[];
+  if(prev&&prev.length===n){
+    var need=Math.max(1,Math.ceil(cw*.4)),s=-1,miss=0,e=0,minH=0;
+    minH=H*(+$('sSen').value)/100;
+    for(var r=0;r<H;r++){
+      var c=0,o=r*cw;
+      for(var x=0;x<cw;x++){var dd=cur[o+x]-prev[o+x];if(dd>25||dd<-25)c++}
+      if(c>=need){if(s<0)s=r;miss=0;e=r}
+      else if(s>=0&&++miss>4){if(e-s+1>=minH)segs.push([s,e]);s=-1;miss=0}
+    }
+    if(s>=0&&e-s+1>=minH)segs.push([s,e]);
+  }
+  prev=cur;
+  /* calibration */
+  if(calT>=0&&segs.length){
+    var bg=segs[0];segs.forEach(function(g){if(g[1]-g[0]>bg[1]-bg[0])bg=g});
+    if(!calBest||bg[1]-bg[0]>calBest[1]-calBest[0])calBest=bg;
+    if(!calEnd)calEnd=now+1200;
+  }
+  if(calT>=0&&calEnd&&now>calEnd){
+    cal[calT]={b:calBest[1]/H*100,h:(calBest[1]-calBest[0]+1)/H*100};
+    calSaved[lanes[calT]]=cal[calT];store.set('chrono60_cal',JSON.stringify(calSaved));
+    var done=calibrated();
+    calT=-1;calBest=null;calEnd=0;buildCal();
+    status(done?'Calibration terminée pour tous les couloirs.':'Couloir enregistré. Calibrez les autres couloirs.');
+  }
+  /* détection de passage */
+  segs.forEach(function(g){g[2]=laneOf(g[1]/H*100,(g[1]-g[0]+1)/H*100)});
+  if(mode==='running'&&calT<0&&now-t0>S.minT){
+    var hit={};segs.forEach(function(g){hit[g[2]]=true});
+    Object.keys(hit).forEach(function(k){stamp(+k,now)});
+  }
+  draw(xa,cw,segs);
+}
+function draw(xa,cw,segs){
+  var OW=ov.width,OH=ov.height,x=xa/W*OW,w=cw/W*OW;
+  ox.clearRect(0,0,OW,OH);
+  ox.fillStyle='rgba(255,212,59,.18)';ox.fillRect(x,0,w,OH);
+  ox.strokeStyle='#ffd43b';ox.lineWidth=3;ox.strokeRect(x,0,w,OH);
+  if(!calibrated()){
+    var b1=+$('sB1').value,b2=Math.min(+$('sB2').value,b1-1);
+    ox.setLineDash([14,10]);ox.lineWidth=2;ox.strokeStyle='rgba(255,255,255,.85)';
+    [b1,b2].forEach(function(b){var y=b/100*OH;ox.beginPath();ox.moveTo(0,y);ox.lineTo(OW,y);ox.stroke()});
+    ox.setLineDash([]);ox.font='bold 26px sans-serif';ox.shadowColor='#000';ox.shadowBlur=4;
+    [[b1,100,0],[b2,b1,1],[0,b2,2]].forEach(function(z){
+      if(z[2]>=lanes.length)return;
+      var li=zoneToLane(z[2]);
+      ox.fillStyle=colHex[li];ox.fillText('Couloir '+lanes[li],10,(z[0]+z[1])/2/100*OH+9);
+    });
+    ox.shadowBlur=0;
+  }
+  segs.forEach(function(g){
+    ox.fillStyle=colHex[g[2]]||'#fff';ox.globalAlpha=.65;
+    ox.fillRect(x-8,g[0]/H*OH,w+16,(g[1]-g[0]+1)/H*OH);ox.globalAlpha=1;
+  });
+}
+
+build();
+})();
+</script>
+</body>
+</html>
